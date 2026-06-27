@@ -100,6 +100,12 @@ document.addEventListener('DOMContentLoaded', () => {
         console.error('Error loading cart from localStorage', e);
     }
 
+    // Wizard and Local Order Tracking State
+    let currentCartStep = 1;
+    let trackingInterval = null;
+    let trackingSecondsLeft = 25 * 60; // 25 minutes default
+    let activeTrackedOrder = null;
+
     const floatingCart = document.getElementById('floating-cart');
     const cartSummaryTrigger = document.getElementById('cart-summary-trigger');
     const cartCountEl = document.getElementById('cart-count');
@@ -114,6 +120,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const modalTotal = document.getElementById('modal-total');
     const modalCheckoutBtn = document.getElementById('modal-checkout-btn');
     const modalWhatsappBtn = document.getElementById('modal-whatsapp-btn');
+    const modalPrintBtn = document.getElementById('modal-print-btn');
     
     // WhatsApp Floating Button Elements
     const whatsappFloatBtn = document.getElementById('whatsapp-float-btn');
@@ -175,12 +182,14 @@ document.addEventListener('DOMContentLoaded', () => {
             if (modalTotal) modalTotal.innerText = '$0.00';
             if (modalCheckoutBtn) modalCheckoutBtn.disabled = true;
             if (modalWhatsappBtn) modalWhatsappBtn.disabled = true;
+            if (modalPrintBtn) modalPrintBtn.disabled = true;
             if (cartSuggestions) cartSuggestions.innerHTML = '';
             return;
         }
 
         if (modalCheckoutBtn) modalCheckoutBtn.disabled = false;
         if (modalWhatsappBtn) modalWhatsappBtn.disabled = false;
+        if (modalPrintBtn) modalPrintBtn.disabled = false;
 
         let listHTML = '';
         cart.forEach((item, index) => {
@@ -416,13 +425,22 @@ document.addEventListener('DOMContentLoaded', () => {
         let html = '';
         orders.forEach((order, orderIndex) => {
             const itemsSummary = order.items.map(item => `${item.name} (x${item.quantity})`).join(', ');
-            const statusLabel = order.status === 'en-camino' ? 'En Camino 🛵' : 'Entregado ✓';
+            
+            let statusLabel = 'Entregado ✓';
+            let statusClass = 'entregado';
+            if (order.status === 'en-preparacion') {
+                statusLabel = 'Preparando 🔥';
+                statusClass = 'en-preparacion';
+            } else if (order.status === 'en-camino') {
+                statusLabel = 'En Camino 🛵';
+                statusClass = 'en-camino';
+            }
             
             html += `
                 <div class="recent-order-card">
                     <div class="recent-order-header">
                         <span class="recent-order-date">${order.date}</span>
-                        <span class="recent-order-status ${order.status}">${statusLabel}</span>
+                        <span class="recent-order-status ${statusClass}">${statusLabel}</span>
                     </div>
                     <div class="recent-order-items-text">${itemsSummary}</div>
                     <div class="recent-order-footer">
@@ -454,14 +472,15 @@ document.addEventListener('DOMContentLoaded', () => {
                     });
                 });
 
+                switchCartStep(1); // Force cart view
                 updateCartUI();
                 showToast('¡Productos agregados al carrito!');
             });
         });
     }
 
-    function saveCurrentCartAsOrder(status = 'en-camino') {
-        if (cart.length === 0) return;
+    function saveCurrentCartAsOrder(status = 'en-camino', customerDetails = null) {
+        if (cart.length === 0) return null;
 
         try {
             const orders = getRecentOrders();
@@ -471,7 +490,8 @@ document.addEventListener('DOMContentLoaded', () => {
                 date: 'Hoy, ' + new Date().toLocaleTimeString('es-ES', { hour: '2-digit', minute: '2-digit' }),
                 items: [...cart],
                 total: cart.reduce((sum, item) => sum + (item.price * item.quantity), 0),
-                status: status
+                status: status,
+                customer: customerDetails
             };
 
             orders.unshift(newOrder);
@@ -481,14 +501,164 @@ document.addEventListener('DOMContentLoaded', () => {
 
             localStorage.setItem('mayago_past_orders', JSON.stringify(orders));
             renderRecentOrders();
+            return newOrder;
         } catch (e) {
             console.error('Error saving current cart as past order', e);
+            return null;
+        }
+    }
+
+    function switchCartStep(step) {
+        currentCartStep = step;
+        
+        const cartMainView = document.getElementById('cart-main-view');
+        const cartCheckoutView = document.getElementById('cart-checkout-view');
+        const cartTrackingView = document.getElementById('cart-tracking-view');
+        
+        if (cartMainView) cartMainView.classList.add('hidden');
+        if (cartCheckoutView) cartCheckoutView.classList.add('hidden');
+        if (cartTrackingView) cartTrackingView.classList.add('hidden');
+        
+        // Hide/show default modal footer buttons
+        if (modalWhatsappBtn) modalWhatsappBtn.style.display = 'none';
+        if (modalCheckoutBtn) modalCheckoutBtn.style.display = 'none';
+        if (modalPrintBtn) modalPrintBtn.style.display = 'none';
+
+        const modalHeaderTitle = document.querySelector('.cart-modal-header h3');
+
+        if (step === 1) {
+            if (cartMainView) cartMainView.classList.remove('hidden');
+            if (modalWhatsappBtn) modalWhatsappBtn.style.display = 'flex';
+            if (modalCheckoutBtn) {
+                modalCheckoutBtn.style.display = 'block';
+                modalCheckoutBtn.innerText = 'Confirmar Pedido Localmente';
+                modalCheckoutBtn.style.backgroundColor = '';
+                modalCheckoutBtn.style.color = '';
+            }
+            if (modalPrintBtn) modalPrintBtn.style.display = 'flex';
+            if (modalHeaderTitle) modalHeaderTitle.innerText = 'Tu Pedido 🍗';
+        } else if (step === 2) {
+            if (cartCheckoutView) cartCheckoutView.classList.remove('hidden');
+            if (modalCheckoutBtn) {
+                modalCheckoutBtn.style.display = 'block';
+                modalCheckoutBtn.innerText = '🚀 Finalizar Pedido Localmente';
+                modalCheckoutBtn.style.backgroundColor = 'var(--primary)';
+                modalCheckoutBtn.style.color = 'var(--white)';
+            }
+            if (modalHeaderTitle) modalHeaderTitle.innerText = 'Detalles de Envío 📍';
+        } else if (step === 3) {
+            if (cartTrackingView) cartTrackingView.classList.remove('hidden');
+            if (modalPrintBtn) {
+                modalPrintBtn.style.display = 'flex';
+            }
+            if (modalHeaderTitle) modalHeaderTitle.innerText = 'Sigue tu Pedido 🛵';
+        }
+    }
+
+    function startLiveTracking(order) {
+        if (!order) return;
+        activeTrackedOrder = order;
+
+        // Populate order details in Tracking View
+        const tdName = document.getElementById('td-val-name');
+        const tdPhone = document.getElementById('td-val-phone');
+        const tdAddress = document.getElementById('td-val-address');
+        const tdPayment = document.getElementById('td-val-payment');
+        const trackingIdEl = document.getElementById('tracking-order-id');
+
+        if (trackingIdEl) trackingIdEl.innerText = `#${order.id}`;
+        if (tdName) tdName.innerText = order.customer?.name || 'Cliente Local';
+        if (tdPhone) tdPhone.innerText = order.customer?.phone || '-';
+        if (tdAddress) tdAddress.innerText = order.customer?.address || 'Entrega Local';
+        if (tdPayment) tdPayment.innerText = order.customer?.payment || 'Efectivo';
+
+        // Clear existing tracking interval if any
+        if (trackingInterval) {
+            clearInterval(trackingInterval);
+        }
+
+        trackingSecondsLeft = 25 * 60; // Reset to 25 minutes
+        updateCountdownDisplay();
+
+        // Start interval
+        trackingInterval = setInterval(() => {
+            trackingSecondsLeft--;
+            if (trackingSecondsLeft <= 0) {
+                trackingSecondsLeft = 0;
+                clearInterval(trackingInterval);
+            }
+            updateCountdownDisplay();
+            updateTimelineStatus();
+        }, 1000);
+
+        // Run initial updates
+        updateTimelineStatus();
+    }
+
+    function updateCountdownDisplay() {
+        const countdownEl = document.getElementById('tracking-countdown');
+        if (!countdownEl) return;
+
+        const minutes = Math.floor(trackingSecondsLeft / 60);
+        const seconds = trackingSecondsLeft % 60;
+        const formattedTime = `${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`;
+        
+        countdownEl.innerText = formattedTime;
+
+        // Also update progress bar fill
+        const progressFill = document.getElementById('tracking-progress-fill');
+        if (progressFill) {
+            const totalSeconds = 25 * 60;
+            const percentage = ((totalSeconds - trackingSecondsLeft) / totalSeconds) * 100;
+            progressFill.style.width = `${Math.max(5, percentage)}%`;
+        }
+    }
+
+    function updateTimelineStatus() {
+        // Steps: recibido, preparando, reparto, entregado
+        const stepRecibido = document.getElementById('step-recibido');
+        const stepPreparando = document.getElementById('step-preparando');
+        const stepReparto = document.getElementById('step-reparto');
+        const stepEntregado = document.getElementById('step-entregado');
+
+        // Stage 1 (Order Received): 25:00 to 24:00 (60 seconds)
+        // Stage 2 (Preparing): 24:00 to 15:00 (9 minutes)
+        // Stage 3 (In Transit): 15:00 to 01:00 (14 minutes)
+        // Stage 4 (Delivered): 01:00 to 00:00
+        const minutesLeft = trackingSecondsLeft / 60;
+
+        // Remove all state classes
+        [stepRecibido, stepPreparando, stepReparto, stepEntregado].forEach(step => {
+            if (step) {
+                step.classList.remove('completed', 'active');
+            }
+        });
+
+        if (minutesLeft > 24) {
+            if (stepRecibido) stepRecibido.classList.add('active');
+        } else if (minutesLeft > 15) {
+            if (stepRecibido) stepRecibido.classList.add('completed');
+            if (stepPreparando) stepPreparando.classList.add('active');
+        } else if (minutesLeft > 1) {
+            if (stepRecibido) stepRecibido.classList.add('completed');
+            if (stepPreparando) stepPreparando.classList.add('completed');
+            if (stepReparto) stepReparto.classList.add('active');
+        } else {
+            if (stepRecibido) stepRecibido.classList.add('completed');
+            if (stepPreparando) stepPreparando.classList.add('completed');
+            if (stepReparto) stepReparto.classList.add('completed');
+            if (stepEntregado) stepEntregado.classList.add('active');
         }
     }
 
     function openModal() {
         if (cartModal) {
             cartModal.classList.remove('hidden');
+            if (currentCartStep !== 3) {
+                switchCartStep(1);
+            } else {
+                switchCartStep(3);
+            }
             renderModalItems();
             renderRecentOrders();
         }
@@ -497,7 +667,19 @@ document.addEventListener('DOMContentLoaded', () => {
     function closeModal() {
         if (cartModal) {
             cartModal.classList.add('hidden');
+            if (currentCartStep === 2) {
+                switchCartStep(1);
+            }
         }
+    }
+
+    // Attach Checkout Back Link Listener
+    const checkoutBackBtn = document.getElementById('checkout-back-btn');
+    if (checkoutBackBtn) {
+        checkoutBackBtn.addEventListener('click', (e) => {
+            e.preventDefault();
+            switchCartStep(1);
+        });
     }
 
     // Modal triggers and close events
@@ -561,26 +743,79 @@ document.addEventListener('DOMContentLoaded', () => {
 
     if (modalCheckoutBtn) {
         modalCheckoutBtn.addEventListener('click', () => {
-            if (cart.length === 0) return;
-            
-            let summaryText = 'Tu Orden:\n';
-            cart.forEach(item => {
-                summaryText += `- ${item.name} x${item.quantity} ($${(item.price * item.quantity).toFixed(2)})\n`;
-            });
-            const totalPrice = cart.reduce((sum, item) => sum + (item.price * item.quantity), 0);
-            summaryText += `\nTotal a pagar: $${totalPrice.toFixed(2)}\n\n¿Confirmar pedido a domicilio?`;
-            
-            // Standard user-facing dialog to confirm or simulate order placement
-            const confirmOrder = confirm(summaryText);
-            if (confirmOrder) {
-                // Save to past orders in localStorage
-                saveCurrentCartAsOrder('en-camino');
+            if (cart.length === 0 && currentCartStep !== 3) {
+                showToast('Tu carrito está vacío 🛒');
+                return;
+            }
+
+            if (currentCartStep === 1) {
+                // Transition to Step 2: Checkout Form
+                const totalPrice = cart.reduce((sum, item) => sum + (item.price * item.quantity), 0);
+                const checkoutTotalValEl = document.getElementById('checkout-total-val');
+                if (checkoutTotalValEl) {
+                    checkoutTotalValEl.innerText = `$${totalPrice.toFixed(2)}`;
+                }
+                switchCartStep(2);
+            } else if (currentCartStep === 2) {
+                // Handle Step 2 Form Submission
+                const nameInput = document.getElementById('checkout-name');
+                const phoneInput = document.getElementById('checkout-phone');
+                const addressInput = document.getElementById('checkout-address');
+                const notesInput = document.getElementById('checkout-notes');
                 
-                alert('¡Pedido Enviado! 🔥 Su pollo asado Maya Go está en camino. Estará en su puerta en menos de 30 minutos.');
-                // Clear cart
-                cart.length = 0;
-                updateCartUI();
-                closeModal();
+                let paymentMethod = 'Efectivo';
+                const paymentRadio = document.querySelector('input[name="checkout-payment"]:checked');
+                if (paymentRadio) {
+                    paymentMethod = paymentRadio.value === 'Tarjeta' ? 'Tarjeta (Terminal)' : 
+                                    paymentRadio.value === 'Transferencia' ? 'Transferencia SPEI' : 'Efectivo';
+                }
+
+                if (!nameInput || !nameInput.value.trim()) {
+                    showToast('⚠️ Por favor ingresa tu nombre completo');
+                    nameInput?.focus();
+                    return;
+                }
+                if (!phoneInput || !phoneInput.value.trim()) {
+                    showToast('⚠️ Por favor ingresa tu teléfono');
+                    phoneInput?.focus();
+                    return;
+                }
+                if (!addressInput || !addressInput.value.trim()) {
+                    showToast('⚠️ Por favor ingresa la dirección de envío');
+                    addressInput?.focus();
+                    return;
+                }
+
+                // Everything is valid! Assemble details
+                const customerDetails = {
+                    name: nameInput.value.trim(),
+                    phone: phoneInput.value.trim(),
+                    address: addressInput.value.trim(),
+                    notes: notesInput ? notesInput.value.trim() : '',
+                    payment: paymentMethod
+                };
+
+                // Save to past orders in localStorage with 'en-preparacion' status
+                const newOrder = saveCurrentCartAsOrder('en-preparacion', customerDetails);
+                
+                if (newOrder) {
+                    // Empty the active cart & refresh UI
+                    cart.length = 0;
+                    try {
+                        localStorage.setItem('mayago_cart', JSON.stringify(cart));
+                    } catch (err) {
+                        console.error('Error clearing saved cart', err);
+                    }
+                    updateCartUI();
+
+                    // Load Tracking View & Start Countdown Simulation
+                    startLiveTracking(newOrder);
+                    switchCartStep(3);
+
+                    showToast('🎉 ¡Pedido registrado localmente!');
+                } else {
+                    showToast('❌ Error al registrar el pedido');
+                }
             }
         });
     }
@@ -616,6 +851,106 @@ document.addEventListener('DOMContentLoaded', () => {
         showToast('Abriendo WhatsApp para enviar tu pedido...');
     }
 
+    function printReceipt(order = null) {
+        const itemsToPrint = order ? order.items : cart;
+        const totalToPrint = order ? order.total : cart.reduce((sum, item) => sum + (item.price * item.quantity), 0);
+        const ticketId = order ? order.id : `PM-${Math.floor(1000 + Math.random() * 9000)}`;
+
+        if (itemsToPrint.length === 0) {
+            showToast('No hay productos para imprimir 🛒');
+            return;
+        }
+
+        const printArea = document.getElementById('receipt-print-area');
+        if (!printArea) return;
+
+        const date = new Date();
+        const formattedDate = date.toLocaleDateString('es-ES', { day: '2-digit', month: '2-digit', year: 'numeric' });
+        const formattedTime = date.toLocaleTimeString('es-ES', { hour: '2-digit', minute: '2-digit' });
+
+        let itemsHtml = '';
+        itemsToPrint.forEach(item => {
+            const itemTotal = item.price * item.quantity;
+            itemsHtml += `
+                <tr>
+                    <td>${item.quantity}x</td>
+                    <td>${item.name}</td>
+                    <td class="num-col">$${itemTotal.toFixed(2)}</td>
+                </tr>
+            `;
+        });
+
+        let customerHtml = '';
+        if (order && order.customer) {
+            customerHtml = `
+                <div class="receipt-divider"></div>
+                <div class="receipt-subtitle" style="text-align: left; font-weight: bold; margin-bottom: 2px;">DATOS DE ENVÍO:</div>
+                <div class="receipt-subtitle" style="text-align: left;">Cliente: ${order.customer.name}</div>
+                <div class="receipt-subtitle" style="text-align: left;">Tel: ${order.customer.phone}</div>
+                <div class="receipt-subtitle" style="text-align: left;">Dir: ${order.customer.address}</div>
+                <div class="receipt-subtitle" style="text-align: left;">Pago: ${order.customer.payment}</div>
+            `;
+        }
+
+        printArea.innerHTML = `
+            <div class="receipt-header">
+                <div class="receipt-title">POLLO MAYA GO</div>
+                <div class="receipt-subtitle">El Auténtico Pollo al Carbón</div>
+                <div class="receipt-subtitle">Mérida, Yucatán, México</div>
+                <div class="receipt-subtitle">Tel: (999) 987-6543</div>
+            </div>
+            ${customerHtml}
+            <div class="receipt-divider"></div>
+            <div class="receipt-info-row">
+                <span>TICKET: #${ticketId}</span>
+                <span>FECHA: ${order ? order.date.replace('Hoy, ', '') : formattedDate}</span>
+            </div>
+            <div class="receipt-info-row">
+                <span>HORA: ${formattedTime}</span>
+                <span>TIPO: 🛵 Delivery</span>
+            </div>
+            <div class="receipt-divider"></div>
+            <table class="receipt-table">
+                <thead>
+                    <tr>
+                        <th style="width: 15%; text-align: left;">Cant</th>
+                        <th style="width: 55%; text-align: left;">Descripción</th>
+                        <th style="width: 30%; text-align: right;">Total</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    ${itemsHtml}
+                </tbody>
+            </table>
+            <div class="receipt-divider"></div>
+            <div class="receipt-summary">
+                <div class="receipt-summary-row">
+                    <span>Subtotal:</span>
+                    <span>$${totalToPrint.toFixed(2)}</span>
+                </div>
+                <div class="receipt-summary-row">
+                    <span>Envío:</span>
+                    <span>GRATIS</span>
+                </div>
+                <div class="receipt-summary-row total-row">
+                    <span>TOTAL COMPRA:</span>
+                    <span>$${totalToPrint.toFixed(2)}</span>
+                </div>
+            </div>
+            <div class="receipt-divider"></div>
+            <div class="receipt-footer">
+                <p>¡Gracias por saborear la receta Maya!</p>
+                <p>Facture en: pollomayago.com/facturar</p>
+                <div class="receipt-barcode-box">
+                    <div class="receipt-barcode-lines">|||||| |||| | ||||||| ||| ||| ||| | |||</div>
+                    <div>*${ticketId}*</div>
+                </div>
+            </div>
+        `;
+
+        window.print();
+    }
+
     if (whatsappFloatBtn) {
         whatsappFloatBtn.addEventListener('click', (e) => {
             e.preventDefault();
@@ -627,6 +962,16 @@ document.addEventListener('DOMContentLoaded', () => {
         modalWhatsappBtn.addEventListener('click', () => {
             sendWhatsAppOrder();
             closeModal();
+        });
+    }
+
+    if (modalPrintBtn) {
+        modalPrintBtn.addEventListener('click', () => {
+            if (currentCartStep === 3 && activeTrackedOrder) {
+                printReceipt(activeTrackedOrder);
+            } else {
+                printReceipt(null);
+            }
         });
     }
 

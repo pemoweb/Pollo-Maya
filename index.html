@@ -359,35 +359,185 @@
                 <button id="close-modal-btn" class="close-modal-btn">&times;</button>
             </div>
             <div class="cart-modal-body">
-                <div id="cart-items-list" class="cart-items-list">
-                    <!-- Dinámicamente llenado por JS -->
-                </div>
-                
-                <!-- Suggestions Section (Cross-selling) -->
-                <div id="cart-suggestions" class="cart-suggestions-section">
-                    <!-- Dinámicamente llenado por JS -->
-                </div>
-
-                <div class="cart-modal-summary">
-                    <div class="summary-row">
-                        <span>Subtotal:</span>
-                        <span id="modal-subtotal">$0.00</span>
-                    </div>
-                    <div class="summary-row">
-                        <span>Envío:</span>
-                        <span class="free-shipping">¡Gratis!</span>
-                    </div>
-                    <div class="summary-row total-row">
-                        <span>Total:</span>
-                        <span id="modal-total">$0.00</span>
-                    </div>
-                </div>
-
-                <!-- Recent Orders Section -->
-                <div class="recent-orders-section">
-                    <h4 class="recent-orders-title">⏱️ Pedidos Recientes</h4>
-                    <div id="recent-orders-list" class="recent-orders-list">
+                <!-- VIEW 1: Main Cart View -->
+                <div id="cart-main-view" class="cart-step-view">
+                    <div id="cart-items-list" class="cart-items-list">
                         <!-- Dinámicamente llenado por JS -->
+                    </div>
+                    
+                    <!-- Suggestions Section (Cross-selling) -->
+                    <div id="cart-suggestions" class="cart-suggestions-section">
+                        <!-- Dinámicamente llenado por JS -->
+                    </div>
+
+                    <div class="cart-modal-summary">
+                        <div class="summary-row">
+                            <span>Subtotal:</span>
+                            <span id="modal-subtotal">$0.00</span>
+                        </div>
+                        <div class="summary-row">
+                            <span>Envío:</span>
+                            <span class="free-shipping">¡Gratis!</span>
+                        </div>
+                        <div class="summary-row total-row">
+                            <span>Total:</span>
+                            <span id="modal-total">$0.00</span>
+                        </div>
+                    </div>
+
+                    <!-- Recent Orders Section -->
+                    <div class="recent-orders-section">
+                        <h4 class="recent-orders-title">⏱️ Pedidos Recientes</h4>
+                        <div id="recent-orders-list" class="recent-orders-list">
+                            <!-- Dinámicamente llenado por JS -->
+                        </div>
+                    </div>
+                </div>
+
+                <!-- VIEW 2: Local Checkout Form View -->
+                <div id="cart-checkout-view" class="cart-step-view hidden">
+                    <a href="#" id="checkout-back-btn" class="checkout-back-link">
+                        <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" style="display: inline-block; vertical-align: middle;">
+                            <line x1="19" y1="12" x2="5" y2="12"></line>
+                            <polyline points="12 19 5 12 12 5"></polyline>
+                        </svg> Volver al Carrito
+                    </a>
+                    
+                    <h4 class="checkout-step-title">📍 Detalles de Entrega Local</h4>
+                    <p class="checkout-step-subtitle">Por favor, ingresa los datos para preparar y enviar tu pedido a domicilio de inmediato.</p>
+
+                    <form id="local-checkout-form" class="checkout-form">
+                        <div class="form-group">
+                            <label for="checkout-name" class="form-label">Nombre Completo <span class="required-star">*</span></label>
+                            <input type="text" id="checkout-name" class="form-input" placeholder="Ej. Juan Carlos Pérez" required>
+                        </div>
+
+                        <div class="form-group">
+                            <label for="checkout-phone" class="form-label">Teléfono de Contacto <span class="required-star">*</span></label>
+                            <input type="tel" id="checkout-phone" class="form-input" placeholder="Ej. 999 123 4567" required>
+                        </div>
+
+                        <div class="form-group">
+                            <label for="checkout-address" class="form-label">Dirección de Envío <span class="required-star">*</span></label>
+                            <textarea id="checkout-address" class="form-input form-textarea" placeholder="Calle, cruzamientos, colonia, referencia (Ej. Calle 50 #120 x 25 y 27, Centro, frente al parque)" required></textarea>
+                        </div>
+
+                        <div class="form-group">
+                            <label class="form-label">Método de Pago <span class="required-star">*</span></label>
+                            <div class="payment-options">
+                                <label class="payment-option-label">
+                                    <input type="radio" name="checkout-payment" value="Efectivo" checked>
+                                    <span class="payment-option-text">💵 Efectivo (Contra entrega)</span>
+                                </label>
+                                <label class="payment-option-label">
+                                    <input type="radio" name="checkout-payment" value="Tarjeta">
+                                    <span class="payment-option-text">💳 Tarjeta (Terminal a domicilio)</span>
+                                </label>
+                                <label class="payment-option-label">
+                                    <input type="radio" name="checkout-payment" value="Transferencia">
+                                    <span class="payment-option-text">🏦 Transferencia SPEI</span>
+                                </label>
+                            </div>
+                        </div>
+
+                        <div class="form-group">
+                            <label for="checkout-notes" class="form-label">Instrucciones Especiales (Opcional)</label>
+                            <input type="text" id="checkout-notes" class="form-input" placeholder="Ej. Tocar el timbre fuerte, sin salsas picantes, etc.">
+                        </div>
+                    </form>
+
+                    <div class="checkout-summary-card">
+                        <div class="checkout-summary-row">
+                            <span>Monto Total a Pagar:</span>
+                            <span id="checkout-total-val" class="checkout-total-val">$0.00</span>
+                        </div>
+                        <div class="checkout-summary-shipping">🛵 ¡Envío Gratuito Incluido!</div>
+                    </div>
+                </div>
+
+                <!-- VIEW 3: Live Order Tracking View -->
+                <div id="cart-tracking-view" class="cart-step-view hidden">
+                    <div class="tracking-success-header">
+                        <div class="tracking-success-icon">🎉</div>
+                        <h4 class="tracking-success-title">¡Pedido Confirmado!</h4>
+                        <p class="tracking-success-subtitle">Tu orden <strong id="tracking-order-id">#PM-1024</strong> ha sido procesada localmente y se encuentra en cola de cocina.</p>
+                    </div>
+
+                    <!-- Live Progress Tracker Map-like Timeline -->
+                    <div class="tracking-timeline">
+                        <div class="tracking-timeline-step" id="step-recibido">
+                            <div class="step-indicator">
+                                <span class="step-icon">📋</span>
+                                <span class="step-checkmark">✓</span>
+                            </div>
+                            <div class="step-content">
+                                <span class="step-title">Orden Recibida</span>
+                                <span class="step-desc" id="step-desc-recibido">Tu pedido ya está en cola de cocina.</span>
+                            </div>
+                        </div>
+
+                        <div class="tracking-timeline-step" id="step-preparando">
+                            <div class="step-indicator">
+                                <span class="step-icon">🔥</span>
+                                <span class="step-checkmark">✓</span>
+                            </div>
+                            <div class="step-content">
+                                <span class="step-title">En Preparación</span>
+                                <span class="step-desc" id="step-desc-preparando">El maestro parrillero está asando tu pollo al carbón.</span>
+                            </div>
+                        </div>
+
+                        <div class="tracking-timeline-step" id="step-reparto">
+                            <div class="step-indicator">
+                                <span class="step-icon">🛵</span>
+                                <span class="step-checkmark">✓</span>
+                            </div>
+                            <div class="step-content">
+                                <span class="step-title">En Camino</span>
+                                <span class="step-desc" id="step-desc-reparto">El repartidor va rumbo a tu dirección asignada.</span>
+                            </div>
+                        </div>
+
+                        <div class="tracking-timeline-step" id="step-entregado">
+                            <div class="step-indicator">
+                                <span class="step-icon">🍽️</span>
+                                <span class="step-checkmark">✓</span>
+                            </div>
+                            <div class="step-content">
+                                <span class="step-title">Entregado</span>
+                                <span class="step-desc" id="step-desc-entregado">¡Buen provecho! Disfruta del sabor auténtico.</span>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Estimaed Time Countdown -->
+                    <div class="tracking-timer-box">
+                        <span class="tracking-timer-label">Tiempo Estimado de Entrega</span>
+                        <span id="tracking-countdown" class="tracking-countdown">25:00</span>
+                        <div class="tracking-progress-container">
+                            <div id="tracking-progress-fill" class="tracking-progress-fill" style="width: 20%;"></div>
+                        </div>
+                    </div>
+
+                    <!-- Summary details card -->
+                    <div class="tracking-details-card">
+                        <h5 class="tracking-details-title">Resumen de Entrega</h5>
+                        <div class="tracking-detail-row">
+                            <span class="td-label">Cliente:</span>
+                            <span id="td-val-name" class="td-value">-</span>
+                        </div>
+                        <div class="tracking-detail-row">
+                            <span class="td-label">Teléfono:</span>
+                            <span id="td-val-phone" class="td-value">-</span>
+                        </div>
+                        <div class="tracking-detail-row">
+                            <span class="td-label">Dirección:</span>
+                            <span id="td-val-address" class="td-value">-</span>
+                        </div>
+                        <div class="tracking-detail-row">
+                            <span class="td-label">Pago:</span>
+                            <span id="td-val-payment" class="td-value">-</span>
+                        </div>
                     </div>
                 </div>
             </div>
@@ -399,6 +549,13 @@
                         </svg>Pedir por WhatsApp
                     </button>
                     <button id="modal-checkout-btn" class="btn btn-outline w-full" style="border-radius: 50px; font-weight: 700; padding: 0.8rem 1.8rem;">Confirmar Pedido Localmente</button>
+                    <button id="modal-print-btn" class="btn btn-print w-full" style="background-color: var(--dark); color: var(--white); border: none; border-radius: 50px; font-weight: 700; padding: 0.8rem 1.8rem; display: flex; align-items: center; justify-content: center; gap: 8px; transition: all 0.3s ease;">
+                        <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                            <polyline points="6 9 6 2 18 2 18 9"></polyline>
+                            <path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"></path>
+                            <rect x="6" y="14" width="12" height="8"></rect>
+                        </svg>Imprimir Recibo
+                    </button>
                 </div>
             </div>
         </div>
@@ -415,6 +572,9 @@
 
     <!-- Toast Notifications Container -->
     <div id="toast-container" class="toast-container"></div>
+
+    <!-- Hidden Print Area for Receipt -->
+    <div id="receipt-print-area"></div>
 
     <script src="script.js"></script>
 </body>
